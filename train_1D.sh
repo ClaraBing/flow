@@ -12,7 +12,7 @@ use_val=1
 
 wb_name="glow_G1D_lr$lr_wd$wd_bt$bt"
 
-CUDA_VISIBLE_DEVICES=1 python train.py \
+WANDB_MODE=dryrun CUDA_VISIBLE_DEVICES=1 python train.py \
   --dataset=$dataset \
   --layer-type=$layer_type \
   --lr=$lr \
