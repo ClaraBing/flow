@@ -11,9 +11,10 @@ def gen(n):
   X[0] = z
   rot = ortho_group.rvs(d)
   X = rot.dot(X).T
+  return X
 
 Xtrain = gen(n_train)
-np.save('d{}_n{}_std_train.npy'.format(d,n_train), Xtrain)
+np.save('d{}_std_train.npy'.format(d), Xtrain)
 Xtest = gen(n_test)
-np.save('d{}_n{}_std_test.npy'.format(d,n_test), Xtest)
+np.save('d{}_std_test.npy'.format(d), Xtest)
 
