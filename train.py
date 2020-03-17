@@ -19,10 +19,48 @@ from data_loader import get_loader
 from models import Glow
 from tqdm import tqdm
 
+import pdb
+
+parser = argparse.ArgumentParser(description='Glow on CIFAR-10')
+
+def str2bool(s):
+    return s.lower().startswith('t')
+
+parser.add_argument('--mode', type=str, choices=['train', 'test'])
+# Model
+parser.add_argument('--num_channels', '-C', default=512, type=int, help='Number of channels in hidden layers')
+parser.add_argument('--num_levels', '-L', default=3, type=int, help='Number of levels in the Glow model')
+parser.add_argument('--num_steps', '-K', default=32, type=int, help='Number of steps of flow in each level')
+parser.add_argument('--layer-type', type=str, choices=['conv', 'fc'])
+# Training
+parser.add_argument('--batch-size', default=64, type=int, help='Batch size per GPU')
+parser.add_argument('--benchmark', type=str2bool, default=True, help='Turn on CUDNN benchmarking')
+parser.add_argument('--optim', type=str, default='SGD')
+parser.add_argument('--lr', default=1e-3, type=float, help='Learning rate.')
+parser.add_argument('--wd', default=1e-5, type=float, help="Weight decay.")
+parser.add_argument('--use-val', type=int, help="Whether to use a val set during training.")
+parser.add_argument('--max_grad_norm', type=float, default=-1., help='Max gradient norm for clipping')
+parser.add_argument('--num_epochs', default=100, type=int, help='Number of epochs to train')
+parser.add_argument('--num_samples', default=64, type=int, help='Number of samples at test time')
+# Data
+parser.add_argument('--dataset', type=str, choices=['cifar10', 'Gaussian1D'])
+parser.add_argument('--fdata', type=str, help="Path to data file.")
+# Misc
+parser.add_argument('--gpu_ids', default=[0], type=eval, help='IDs of GPUs to use')
+parser.add_argument('--num_workers', default=8, type=int, help='Number of data loader threads')
+parser.add_argument('--resume', type=str2bool, default=False, help='Resume from checkpoint')
+parser.add_argument('--seed', type=int, default=0, help='Random seed for reproducibility')
+parser.add_argument('--warm_up', default=500000, type=int, help='Number of steps for lr warm-up')
+# wandb
+parser.add_argument('--project', type=str)
+parser.add_argument('--wb-name', type=str)
+
+args = parser.parse_args()
+
 import wandb
 wandb.init(project=args.project, name=args.wb_name, config=args)
 
-def main(args):
+def main():
     # Set up main device and scale batch size
     device = 'cuda' if torch.cuda.is_available() and args.gpu_ids else 'cpu'
     args.batch_size *= max(1, len(args.gpu_ids))
@@ -35,11 +73,13 @@ def main(args):
     
     # Model
     print('Building model..')
+    pdb.set_trace()
     net = Glow(num_channels=args.num_channels,
                num_levels=args.num_levels,
                num_steps=args.num_steps,
                layer_type=args.layer_type)
     net = net.to(device)
+    print('Model built.')
     if device == 'cuda':
         net = torch.nn.DataParallel(net, args.gpu_ids)
         cudnn.benchmark = args.benchmark
@@ -160,41 +200,6 @@ def test(epoch, net, testloader, device, loss_fn, num_samples):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Glow on CIFAR-10')
-
-    def str2bool(s):
-        return s.lower().startswith('t')
-
-    parser.add_argument('--mode', type=str, choices=['train', 'test'])
-    # Model
-    parser.add_argument('--num_channels', '-C', default=512, type=int, help='Number of channels in hidden layers')
-    parser.add_argument('--num_levels', '-L', default=3, type=int, help='Number of levels in the Glow model')
-    parser.add_argument('--num_steps', '-K', default=32, type=int, help='Number of steps of flow in each level')
-    parser.add_argument('--layer-type', type=str, choices=['conv', 'fc'])
-    # Training
-    parser.add_argument('--batch_size', default=64, type=int, help='Batch size per GPU')
-    parser.add_argument('--benchmark', type=str2bool, default=True, help='Turn on CUDNN benchmarking')
-    parser.add_argument('--optim', type=str, default='SGD')
-    parser.add_argument('--lr', default=1e-3, type=float, help='Learning rate.')
-    parser.add_argument('--wd', default=1e-5, type=float, help="Weight decay.")
-    parser.add_argument('--use-val', type=int, help="Whether to use a val set during training.")
-    parser.add_argument('--max_grad_norm', type=float, default=-1., help='Max gradient norm for clipping')
-    parser.add_argument('--num_epochs', default=100, type=int, help='Number of epochs to train')
-    parser.add_argument('--num_samples', default=64, type=int, help='Number of samples at test time')
-    # Data
-    parser.add_argument('--dataset', type=str, choices=['cifar10', 'Gaussian1D'])
-    parser.add_argument('--fdata', type=str, help="Path to data file.")
-    # Misc
-    parser.add_argument('--gpu_ids', default=[0], type=eval, help='IDs of GPUs to use')
-    parser.add_argument('--num_workers', default=8, type=int, help='Number of data loader threads')
-    parser.add_argument('--resume', type=str2bool, default=False, help='Resume from checkpoint')
-    parser.add_argument('--seed', type=int, default=0, help='Random seed for reproducibility')
-    parser.add_argument('--warm_up', default=500000, type=int, help='Number of steps for lr warm-up')
-    # wandb
-    parser.add_argument('--project', type=str)
-    parser.add_argument('--name', type=str)
-
     best_loss = 0
     global_step = 0
-
-    main(parser.parse_args())
+    main()

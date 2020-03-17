@@ -1,6 +1,5 @@
 import torch
 import torch.utils.data as data
-from .cifar10 import CIFAR10
 
 def get_loader(args, is_train):
   args.dataset = args.dataset.lower()

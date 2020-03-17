@@ -96,7 +96,8 @@ class _Glow(nn.Module):
             self.next = _Glow(in_channels=2 * in_channels,
                               mid_channels=mid_channels,
                               num_levels=num_levels - 1,
-                              num_steps=num_steps)
+                              num_steps=num_steps,
+                              layer_type=layer_type)
         else:
             self.next = None
 
