@@ -34,6 +34,7 @@ class Glow(nn.Module):
                            layer_type=layer_type)
 
     def forward(self, x, reverse=False):
+        # pdb.set_trace()
         if reverse:
             sldj = torch.zeros(x.size(0), device=x.device)
         else:
@@ -65,10 +66,14 @@ class Glow(nn.Module):
         Returns:
             y (torch.Tensor): Dequantized logits of `x`.
         """
-        y = (x * 255. + torch.rand_like(x)) / 256.
-        y = (2 * y - 1) * self.bounds
-        y = (y + 1) / 2
-        y = y.log() - (1. - y).log()
+        if x.ndim == 4:
+          y = (x * 255. + torch.rand_like(x)) / 256.
+          y = (2 * y - 1) * self.bounds
+          y = (y + 1) / 2
+          y = y.log() - (1. - y).log()
+        else:
+          # TODO: check if this is correct
+          y = x
 
         # Save log-determinant of Jacobian of initial transform
         ldj = F.softplus(y) + F.softplus(-y) \
