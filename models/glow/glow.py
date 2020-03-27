@@ -6,6 +6,7 @@ from models.glow.act_norm import ActNorm
 from models.glow.coupling import Coupling
 from models.glow.inv_conv import InvConv
 
+import pdb
 
 class Glow(nn.Module):
     """Glow Model
@@ -16,18 +17,18 @@ class Glow(nn.Module):
     (https://arxiv.org/abs/1807.03039).
 
     Args:
-        num_channels (int): Number of channels in middle convolution of each
-            step of flow.
+        in_channels (int): Number of channels in the input.
+        mid_channels (int): Number of channels in middle convolution of each step of flow.
         num_levels (int): Number of levels in the entire model.
         num_steps (int): Number of steps of flow for each level.
     """
-    def __init__(self, num_channels, num_levels, num_steps, layer_type):
+    def __init__(self, in_channels, mid_channels, num_levels, num_steps, layer_type):
         super(Glow, self).__init__()
 
         # Use bounds to rescale images before converting to logits, not learned
         self.register_buffer('bounds', torch.tensor([0.9], dtype=torch.float32))
-        self.flows = _Glow(in_channels=4 * 3,  # RGB image after squeeze
-                           mid_channels=num_channels,
+        self.flows = _Glow(in_channels=in_channels,
+                           mid_channels=mid_channels,
                            num_levels=num_levels,
                            num_steps=num_steps,
                            layer_type=layer_type)
@@ -37,13 +38,14 @@ class Glow(nn.Module):
             sldj = torch.zeros(x.size(0), device=x.device)
         else:
             # Expect inputs in [0, 1]
-            if x.min() < 0 or x.max() > 1:
-                raise ValueError('Expected x in [0, 1], got min/max {}/{}'
-                                 .format(x.min(), x.max()))
+            # if x.min() < 0 or x.max() > 1:
+            #     raise ValueError('Expected x in [0, 1], got min/max {}/{}'
+            #                      .format(x.min(), x.max()))
 
             # De-quantize and convert to logits
             x, sldj = self._pre_process(x)
 
+        # TODO: check if squeeze affect FC
         x = squeeze(x)
         x, sldj = self.flows(x, sldj, reverse)
         x = squeeze(x, reverse=True)
@@ -92,8 +94,9 @@ class _Glow(nn.Module):
                                               layer_type=layer_type)
                                     for _ in range(num_steps)])
 
+        self.num_levels = num_levels
         if num_levels > 1:
-            self.next = _Glow(in_channels=2 * in_channels,
+            self.next = _Glow(in_channels=2*in_channels if layer_type=='conv' else in_channels//2,
                               mid_channels=mid_channels,
                               num_levels=num_levels - 1,
                               num_steps=num_steps,
@@ -119,24 +122,25 @@ class _Glow(nn.Module):
 
         return x, sldj
 
-
 class _FlowStep(nn.Module):
     def __init__(self, in_channels, mid_channels, layer_type):
         super(_FlowStep, self).__init__()
 
         # Activation normalization, invertible 1x1 convolution, affine coupling
-        self.norm = ActNorm(in_channels, return_ldj=True)
-        self.conv = InvConv(in_channels)
+        self.norm = ActNorm(in_channels, layer_type, return_ldj=True)
+        self.conv = InvConv(in_channels) if layer_type == 'conv' else None
         self.coup = Coupling(in_channels // 2, mid_channels, layer_type)
 
     def forward(self, x, sldj=None, reverse=False):
         if reverse:
             x, sldj = self.coup(x, sldj, reverse)
-            x, sldj = self.conv(x, sldj, reverse)
+            if self.conv is not None:
+              x, sldj = self.conv(x, sldj, reverse)
             x, sldj = self.norm(x, sldj, reverse)
         else:
             x, sldj = self.norm(x, sldj, reverse)
-            x, sldj = self.conv(x, sldj, reverse)
+            if self.conv is not None:
+              x, sldj = self.conv(x, sldj, reverse)
             x, sldj = self.coup(x, sldj, reverse)
 
         return x, sldj
@@ -153,16 +157,37 @@ def squeeze(x, reverse=False):
     Returns:
         x (torch.Tensor): Squeezed or unsqueezed tensor.
     """
-    b, c, h, w = x.size()
-    if reverse:
+    if x.ndim == 4:
+      # Conv setting
+      b, c, h, w = x.size()
+
+      if reverse:
+          # Unsqueeze
+          x = x.view(b, c // 4, 2, 2, h, w)
+          x = x.permute(0, 1, 4, 2, 5, 3).contiguous()
+          x = x.view(b, c // 4, h * 2, w * 2)
+      else:
+          # Squeeze
+          x = x.view(b, c, h // 2, 2, w // 2, 2)
+          x = x.permute(0, 1, 3, 5, 2, 4).contiguous()
+          x = x.view(b, c * 2 * 2, h // 2, w // 2)
+
+    elif x.ndim == 2:
+      # FC setting
+      b, c = x.size()
+
+      if reverse:
         # Unsqueeze
-        x = x.view(b, c // 4, 2, 2, h, w)
-        x = x.permute(0, 1, 4, 2, 5, 3).contiguous()
-        x = x.view(b, c // 4, h * 2, w * 2)
-    else:
+        x = x.view(b, c // 4, 2, 2)
+        x = x.permute(0, 1, 3, 2).contiguous()
+        x = x.view(b, c)
+      else:
         # Squeeze
-        x = x.view(b, c, h // 2, 2, w // 2, 2)
-        x = x.permute(0, 1, 3, 5, 2, 4).contiguous()
-        x = x.view(b, c * 2 * 2, h // 2, w // 2)
+        x = x.view(b, c // 4, 2, 2)
+        x = x.permute(0, 1, 3, 2).contiguous()
+        x = x.view(b, c)
+
+    else:
+      raise ValueError("x.ndim should be 4 or 2, got {}.".format(x.ndim))
 
     return x

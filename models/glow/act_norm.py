@@ -21,8 +21,8 @@ class ActNorm(nn.Module):
           self.bias = nn.Parameter(torch.zeros(1, num_features, 1, 1))
           self.logs = nn.Parameter(torch.zeros(1, num_features, 1, 1))
         elif layer_type == 'fc':
-          self.bias = nn.Parameter(torch.zeros(num_features))
-          self.logs = nn.Parameter(torch.zeros(num_features))
+          self.bias = nn.Parameter(torch.zeros(1, num_features))
+          self.logs = nn.Parameter(torch.zeros(1, num_features))
 
         self.num_features = num_features
         self.scale = float(scale)
@@ -39,20 +39,15 @@ class ActNorm(nn.Module):
             bias = -mean_dim(x.clone(), dim=dim, keepdims=True)
             v = mean_dim((x.clone() + bias) ** 2, dim=dim, keepdims=True)
             logs = (self.scale / (v.sqrt() + self.eps)).log()
-            if self.bias.shape != bias.shape:
-              pdb.set_trace()
             self.bias.data.copy_(bias.data)
             self.logs.data.copy_(logs.data)
             self.is_initialized += 1.
 
     def _center(self, x, reverse=False):
-        try:
-          if reverse:
-              return x - self.bias
-          else:
-              return x + self.bias
-        except:
-          pdb.set_trace()
+        if reverse:
+            return x - self.bias
+        else:
+            return x + self.bias
 
     def _scale(self, x, sldj, reverse=False):
         logs = self.logs
