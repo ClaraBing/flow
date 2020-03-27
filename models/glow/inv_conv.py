@@ -21,7 +21,12 @@ class InvConv(nn.Module):
         self.weight = nn.Parameter(torch.from_numpy(w_init))
 
     def forward(self, x, sldj, reverse=False):
-        ldj = torch.slogdet(self.weight)[1] * x.size(2) * x.size(3)
+        
+        # TODO: may not need this if not using InvConv for fc setting.
+        if x.ndim == 4:
+          ldj = torch.slogdet(self.weight)[1] * x.size(2) * x.size(3)
+        else:
+          ldj = torch.slogdet(self.weight)[1]
 
         if reverse:
             weight = torch.inverse(self.weight.double()).float()
