@@ -181,17 +181,13 @@ def squeeze(x, reverse=False):
       # FC setting
       b, c = x.size()
 
-      if reverse:
-        # Unsqueeze
-        x = x.view(b, c // 4, 2, 2)
-        x = x.permute(0, 1, 3, 2).contiguous()
-        x = x.view(b, c)
+      if c == 2:
+        x = torch.stack([x[:, 1], x[:, 0]], 1)
       else:
-        # Squeeze
+        # Unsqueeze and squeeze are the same
         x = x.view(b, c // 4, 2, 2)
         x = x.permute(0, 1, 3, 2).contiguous()
         x = x.view(b, c)
-
     else:
       raise ValueError("x.ndim should be 4 or 2, got {}.".format(x.ndim))
 
