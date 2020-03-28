@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from models.glow.act_norm import ActNorm
 
+import pdb
 
 class Coupling(nn.Module):
     """Affine coupling layer originally used in Real NVP and described by Glow.
@@ -20,7 +21,10 @@ class Coupling(nn.Module):
     def __init__(self, in_dim, mid_dim, layer_type):
         super(Coupling, self).__init__()
         self.nn = NN(in_dim, mid_dim, 2 * in_dim, layer_type=layer_type)
-        self.scale = nn.Parameter(torch.ones(in_dim, 1, 1))
+        if layer_type == 'conv':
+          self.scale = nn.Parameter(torch.ones(in_dim, 1, 1))
+        else:
+          self.scale = nn.Parameter(torch.ones(in_dim))
 
     def forward(self, x, ldj, reverse=False):
         x_change, x_id = x.chunk(2, dim=1)
